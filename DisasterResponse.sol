@@ -23,7 +23,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 approveVotes;
         uint256 rejectVotes;
         uint256 votingDeadline;
-        mapping(address => bool) hasVoted;
+        mapping(address => bool) hasVoted; // Replace this
+        mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
     }
 
     struct ProofProposal {
@@ -37,7 +38,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 approveVotes;
         uint256 rejectVotes;
         uint256 votingDeadline;
-        mapping(address => bool) hasVoted;
+        mapping(address => bool) hasVoted; // Replace this
+        mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
     }
 
     mapping(uint256 => Disaster) public disasters;
@@ -45,7 +47,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     mapping(uint256 => ProofProposal) public proofProposals;
     mapping(uint256 => mapping(address => uint256)) public donations;
     mapping(uint256 => mapping(address => uint256)) public votingPower;
-    mapping(address => uint256) public globalVotingPower;
     uint256 public disasterCount;
     uint256 public inactiveDisasterCount; // 因此 ID 為 inactiveDisasterCount+1 ~ disasterCount 的災難才是活躍災難
     // 要如何把災難設為不活躍？一樣做一個函數給人呼叫並給予獎勵？有沒有其他辦法？
@@ -132,12 +133,17 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             "Voting period ended"
         );
         require(!proposal.hasVoted[msg.sender], "Already voted");
-        require(globalVotingPower[msg.sender] > 0, "No global voting power");
+        uint256 totalVotingPower = 0;
+        for (uint256 i = 1; i <= disasterCount; i++) {
+            totalVotingPower += votingPower[i][msg.sender];
+        }
+        require(totalVotingPower > 0, "No voting power");
         proposal.hasVoted[msg.sender] = true;
+        proposal.voteType[msg.sender] = approve; // Record the vote type
         if (approve) {
-            proposal.approveVotes += globalVotingPower[msg.sender];
+            proposal.approveVotes += totalVotingPower;
         } else {
-            proposal.rejectVotes += globalVotingPower[msg.sender];
+            proposal.rejectVotes += totalVotingPower;
         }
         emit Voted(newProposalId, msg.sender, approve);
     }
@@ -154,6 +160,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             "No voting power for this disaster"
         );
         proposal.hasVoted[msg.sender] = true;
+        proposal.voteType[msg.sender] = approve; // Record the vote type
         if (approve) {
             proposal.approveVotes += votingPower[proposal.disasterId][
                 msg.sender
@@ -187,7 +194,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 true
             );
             payable(proposal.proposer).transfer(stakeAmount + newRewardAmount);
-            emit DisasterCreated(disasterCount,);
+            emit DisasterCreated(disasterCount);
         } else {
             payable(proposal.proposer).transfer((stakeAmount * 9) / 10);
         }
@@ -217,11 +224,38 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     function donate(uint256 disasterId) external payable {
         require(msg.value > 0, "Donation must be greater than 0");
         require(disasters[disasterId].active, "Disaster not active");
+
+        // Update donation and total donations
         donations[disasterId][msg.sender] += msg.value;
         disasters[disasterId].totalDonations += msg.value;
+
+        // Calculate new voting power
+        uint256 previousVotingPower = votingPower[disasterId][msg.sender];
         uint256 newVotingPower = sqrt(donations[disasterId][msg.sender] / 1e18);
         votingPower[disasterId][msg.sender] = newVotingPower;
-        globalVotingPower[msg.sender] += newVotingPower;
+
+        // Adjust votes if the donor has already voted for proof proposals
+        for (uint256 i = 1; i <= proofProposalCount; i++) {
+            if (
+                proofProposals[i].disasterId == disasterId &&
+                proofProposals[i].hasVoted[msg.sender]
+            ) {
+                if (proofProposals[i].voteType[msg.sender]) {
+                    // Adjust approve votes
+                    proofProposals[i].approveVotes =
+                        proofProposals[i].approveVotes -
+                        previousVotingPower +
+                        newVotingPower;
+                } else {
+                    // Adjust reject votes
+                    proofProposals[i].rejectVotes =
+                        proofProposals[i].rejectVotes -
+                        previousVotingPower +
+                        newVotingPower;
+                }
+            }
+        }
+
         emit Donated(disasterId, msg.sender, msg.value, newVotingPower);
     }
 
