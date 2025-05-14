@@ -14,7 +14,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         bool active;
     }
 
-    struct NewProposal {
+    struct Request {
         uint256 id;
         string title;
         string cid; // 標題以外的敘述都傳到 IPFS，避免儲存太多資料花費太多 Gas Fee（如果網頁不想做這麼麻煩，也可以直接存成字串）
@@ -53,7 +53,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     mapping(uint256 => Disaster) public disasters;
-    mapping(uint256 => NewProposal) public newProposals;
+    mapping(uint256 => Request) public requests;
     mapping(uint256 => ProofProposal) public proofProposals;
     mapping(uint256 => mapping(address => uint256)) public donations;
     mapping(uint256 => mapping(address => uint256)) public votingPower;
@@ -61,7 +61,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     uint256 public disasterCount;
     uint256 public inactiveDisasterCount; // 因此 ID 為 inactiveDisasterCount+1 ~ disasterCount 的災難才是活躍災難
     // 要如何把災難設為不活躍？一樣做一個函數給人呼叫並給予獎勵？有沒有其他辦法？
-    uint256 public newProposalCount;
+    uint256 public requestCount;
     uint256 public proofProposalCount;
     uint256 public stakeAmount = 0.1 ether;
     uint256 public newRewardAmount = 0.005 ether;
@@ -70,8 +70,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     uint256 public constant MIN_APPROVE_RATIO_NEW = 5; // 新增災難同意票需達總票數 5%，因為先前的捐款者可能沒有活躍關注此 DAO。
     uint256 public constant MIN_APPROVE_RATIO_PROOF = 25; // 請款同意票需達總票數 1/4
 
-    event DisasterProposed(
-        uint256 indexed proposalId,
+    event DisasterRequested(
+        uint256 indexed requestId,
         address proposer,
         string title,
         uint256 deadline
@@ -97,7 +97,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     constructor(address[] memory initialAdmins) Ownable(msg.sender) {
         // 初始化合約，設定初始管理員
         disasterCount = 0;
-        newProposalCount = 0;
+        requestCount = 0;
         proofProposalCount = 0;
 
         // 設定初始管理員
@@ -106,22 +106,22 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         }
     }
 
-    // 創建新的災難提案
+    // 創建新的災難請求
     function createDisaster(
         string memory title,
         string memory cid,
         uint256 deadline
     ) external payable {
         require(msg.value == stakeAmount, "Must stake 0.1 ETH");
-        newProposalCount++;
-        NewProposal storage proposal = newProposals[newProposalCount];
-        proposal.id = newProposalCount;
-        proposal.title = title;
-        proposal.cid = cid;
-        proposal.proposer = msg.sender;
-        proposal.approved = false;
-        proposal.votingDeadline = block.timestamp + VOTING_PERIOD;
-        emit DisasterProposed(newProposalCount, msg.sender, title, deadline);
+        requestCount++;
+        Request storage request = requests[requestCount];
+        request.id = requestCount;
+        request.title = title;
+        request.cid = cid;
+        request.proposer = msg.sender;
+        request.approved = false;
+        request.votingDeadline = block.timestamp + VOTING_PERIOD;
+        emit DisasterRequested(requestCount, msg.sender, title, deadline);
     }
 
     // 提交災難的請款證明
@@ -145,24 +145,24 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit ProofProposed(proofProposalCount, disasterId, msg.sender, title);
     }
 
-    // 管理員對新增災難提案進行投票
-    function voteNew(uint256 newProposalId, bool approve) external {
+    // 管理員對災難請求進行投票
+    function voteRequest(uint256 requestId, bool approve) external {
         require(admins[msg.sender], "Only admins can vote"); // Restrict to admins
-        NewProposal storage proposal = newProposals[newProposalId];
+        Request storage request = requests[requestId];
         require(
-            block.timestamp <= proposal.votingDeadline,
+            block.timestamp <= request.votingDeadline,
             "Voting period ended"
         );
-        require(!proposal.hasVoted[msg.sender], "Already voted");
+        require(!request.hasVoted[msg.sender], "Already voted");
 
-        proposal.hasVoted[msg.sender] = true;
-        proposal.voteType[msg.sender] = approve; // Record the vote type
+        request.hasVoted[msg.sender] = true;
+        request.voteType[msg.sender] = approve; // Record the vote type
         if (approve) {
-            proposal.approveVotes += 1; // Admins have one vote each
+            request.approveVotes += 1; // Admins have one vote each
         } else {
-            proposal.rejectVotes += 1;
+            request.rejectVotes += 1;
         }
-        emit Voted(newProposalId, msg.sender, approve);
+        emit Voted(requestId, msg.sender, approve);
     }
 
     // 新增管理員（僅限合約擁有者）
@@ -201,33 +201,33 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit Voted(proofProposalId, msg.sender, approve);
     }
 
-    // 最終化災難提案，根據投票結果決定是否通過
-    function finalizeDisaster(uint256 proposalId) external nonReentrant {
-        NewProposal storage proposal = newProposals[proposalId];
+    // 最終化災難請求，根據投票結果決定是否通過
+    function finalizeDisaster(uint256 requestId) external nonReentrant {
+        Request storage request = requests[requestId];
         require(
-            block.timestamp > proposal.votingDeadline,
+            block.timestamp > request.votingDeadline,
             "Voting period not ended"
         );
-        require(!proposal.approved, "Already finalized");
-        uint256 totalVotes = proposal.approveVotes + proposal.rejectVotes;
-        bool passed = proposal.approveVotes > proposal.rejectVotes &&
+        require(!request.approved, "Already finalized");
+        uint256 totalVotes = request.approveVotes + request.rejectVotes;
+        bool passed = request.approveVotes > request.rejectVotes &&
             totalVotes > 0 &&
-            (proposal.approveVotes * 100) / totalVotes >= MIN_APPROVE_RATIO_NEW;
+            (request.approveVotes * 100) / totalVotes >= MIN_APPROVE_RATIO_NEW;
         if (passed) {
             disasterCount++;
             disasters[disasterCount] = Disaster(
-                proposal.title,
-                proposal.cid,
+                request.title,
+                request.cid,
                 block.timestamp + 30 days, // 假設災難持續 30 天
                 0,
                 true
             );
-            payable(proposal.proposer).transfer(stakeAmount + newRewardAmount);
+            payable(request.proposer).transfer(stakeAmount + newRewardAmount);
             emit DisasterCreated(disasterCount);
         } else {
-            payable(proposal.proposer).transfer((stakeAmount * 9) / 10);
+            payable(request.proposer).transfer((stakeAmount * 9) / 10);
         }
-        proposal.approved = true;
+        request.approved = true;
     }
 
     // 最終化請款提案，根據投票結果決定是否通過
@@ -330,28 +330,28 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
-    // 獲取用戶可以投票的新增災難提案
-    function getVoteableNewProposals()
+    // 獲取用戶可以投票的災難請求
+    function getVoteableRequests()
         external
         view
-        returns (NewProposal[] memory)
+        returns (Request[] memory)
     {
-        NewProposal[] memory votableProposals = new NewProposal[](
-            newProposalCount
+        Request[] memory votableRequests = new Request[](
+            requestCount
         );
         uint256 count = 0;
-        for (uint256 i = 1; i <= newProposalCount; i++) {
+        for (uint256 i = 1; i <= requestCount; i++) {
             if (
-                !newProposals[i].approved &&
-                block.timestamp <= newProposals[i].votingDeadline
+                !requests[i].approved &&
+                block.timestamp <= requests[i].votingDeadline
             ) {
-                votableProposals[count] = newProposals[i];
+                votableRequests[count] = requests[i];
                 count++;
             }
         }
-        NewProposal[] memory result = new NewProposal[](count);
+        Request[] memory result = new Request[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = votableProposals[i];
+            result[i] = votableRequests[i];
         }
         return result;
     }
@@ -381,9 +381,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
-    // 獲取指定新增災難提案的詳情
-    function getNewProposal(
-        uint256 proposalId
+    // 獲取指定新增災難請求的詳情
+    function getNewRequest(
+        uint256 requestId
     )
         external
         view
@@ -398,16 +398,16 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             uint256 votingDeadline
         )
     {
-        NewProposal storage proposal = newProposals[proposalId];
+        Request storage request = requests[requestId];
         return (
-            proposal.id,
-            proposal.title,
-            proposal.cid,
-            proposal.proposer,
-            proposal.approved,
-            proposal.approveVotes,
-            proposal.rejectVotes,
-            proposal.votingDeadline
+            request.id,
+            request.title,
+            request.cid,
+            request.proposer,
+            request.approved,
+            request.approveVotes,
+            request.rejectVotes,
+            request.votingDeadline
         );
     }
 
