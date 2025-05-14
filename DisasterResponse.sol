@@ -95,16 +95,18 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     );
 
     constructor(address[] memory initialAdmins) Ownable(msg.sender) {
+        // 初始化合約，設定初始管理員
         disasterCount = 0;
         newProposalCount = 0;
         proofProposalCount = 0;
 
-        // Assign initial admins
+        // 設定初始管理員
         for (uint256 i = 0; i < initialAdmins.length; i++) {
             admins[initialAdmins[i]] = true;
         }
     }
 
+    // 創建新的災難提案
     function createDisaster(
         string memory title,
         string memory cid,
@@ -122,6 +124,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit DisasterProposed(newProposalCount, msg.sender, title, deadline);
     }
 
+    // 提交災難的請款證明
     function submitProof(
         uint256 disasterId,
         string memory title,
@@ -142,6 +145,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit ProofProposed(proofProposalCount, disasterId, msg.sender, title);
     }
 
+    // 管理員對新增災難提案進行投票
     function voteNew(uint256 newProposalId, bool approve) external {
         require(admins[msg.sender], "Only admins can vote"); // Restrict to admins
         NewProposal storage proposal = newProposals[newProposalId];
@@ -161,16 +165,17 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit Voted(newProposalId, msg.sender, approve);
     }
 
-    // Optional: Function to add new admins (only callable by the owner)
+    // 新增管理員（僅限合約擁有者）
     function addAdmin(address admin) external onlyOwner {
         admins[admin] = true;
     }
 
-    // Optional: Function to remove admins (only callable by the owner)
+    // 移除管理員（僅限合約擁有者）
     function removeAdmin(address admin) external onlyOwner {
         admins[admin] = false;
     }
 
+    // 對災難的請款提案進行投票
     function voteProof(uint256 proofProposalId, bool approve) external {
         ProofProposal storage proposal = proofProposals[proofProposalId];
         require(
@@ -196,6 +201,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit Voted(proofProposalId, msg.sender, approve);
     }
 
+    // 最終化災難提案，根據投票結果決定是否通過
     function finalizeDisaster(uint256 proposalId) external nonReentrant {
         NewProposal storage proposal = newProposals[proposalId];
         require(
@@ -224,6 +230,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         proposal.approved = true;
     }
 
+    // 最終化請款提案，根據投票結果決定是否通過
     function approveProof(uint256 proposalId) external nonReentrant {
         ProofProposal storage proposal = proofProposals[proposalId];
         require(
@@ -244,6 +251,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         );
     }
 
+    // 捐款給指定的災難
     function donate(uint256 disasterId) external payable {
         require(msg.value > 0, "Donation must be greater than 0");
         require(disasters[disasterId].active, "Disaster not active");
@@ -282,10 +290,12 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         emit Donated(disasterId, msg.sender, msg.value, newVotingPower);
     }
 
+    // 獲取災難總數
     function getDisasterCount() external view returns (uint256) {
         return disasterCount;
     }
 
+    // 獲取所有災難的列表
     function getDisasterList() external view returns (Disaster[] memory) {
         Disaster[] memory disasterList = new Disaster[](disasterCount);
         for (uint256 i = 1; i <= disasterCount; i++) {
@@ -294,12 +304,14 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return disasterList;
     }
 
+    // 根據災難 ID 獲取災難詳情
     function getDisasterById(
         uint256 disasterId
     ) external view returns (Disaster memory) {
         return disasters[disasterId];
     }
 
+    // 獲取用戶可以投票的災難 ID 列表
     function canVoteDisaster(
         address voter
     ) external view returns (uint256[] memory) {
@@ -318,6 +330,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取用戶可以投票的新增災難提案
     function getVoteableNewProposals()
         external
         view
@@ -343,6 +356,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取指定災難的可投票請款提案
     function getVoteableProofProposals(
         uint256 disasterId
     ) external view returns (ProofProposal[] memory) {
@@ -367,6 +381,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取指定新增災難提案的詳情
     function getNewProposal(
         uint256 proposalId
     )
@@ -396,6 +411,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         );
     }
 
+    // 獲取指定請款提案的詳情
     function getProofProposal(
         uint256 proposalId
     )
@@ -429,6 +445,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         );
     }
 
+    // 獲取用戶的捐款總數
     function getMyDonationsCount() external view returns (uint256) {
         uint256 count = 0;
         for (uint256 i = 1; i <= disasterCount; i++) {
@@ -439,6 +456,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return count;
     }
 
+    // 獲取用戶的捐款記錄
     function getMyDonations(uint256 from, uint256 to) external view returns (DonationRecord[] memory) {
         require(from < to, "Invalid range");
         require(to <= disasterCount, "Range exceeds disaster count");
@@ -475,6 +493,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return records;
     }
 
+    // 獲取已到期的災難 ID 列表
     function dueDisaster() external view returns (uint256[] memory) {
         uint256[] memory dueDisasters = new uint256[](disasterCount);
         uint256 count = 0;
@@ -494,6 +513,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取正在進行中的災難 ID 列表
     function ongoingDisaster() external view returns (uint256[] memory) {
         uint256[] memory activeDisasters = new uint256[](disasterCount);
         uint256 count = 0;
@@ -512,6 +532,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取用戶未投票的請款提案 ID 列表
     function unvoteProposal(uint256 disasterId) external view returns (uint256[] memory) {
         uint256[] memory unvotedProposals = new uint256[](proofProposalCount);
         uint256 count = 0;
@@ -532,6 +553,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取用戶已投票的請款提案 ID 列表
     function voteProposal(uint256 disasterId) external view returns (uint256[] memory) {
         uint256[] memory votedProposals = new uint256[](proofProposalCount);
         uint256 count = 0;
@@ -551,6 +573,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取正在進行中的請款提案 ID 列表
     function ongoingProposal(uint256 disasterId) external view returns (uint256[] memory) {
         uint256[] memory ongoingProposals = new uint256[](proofProposalCount);
         uint256 count = 0;
@@ -571,6 +594,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
+    // 獲取指定請款提案的詳細資訊
     function getProposalDetails(uint256 proposalId) external view returns (
         uint256 id,
         string memory title,
@@ -601,11 +625,12 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         );
     }
 
-    // Helper function to convert address to string
+    // 將地址轉換為字串
     function toString(address account) internal pure returns (string memory) {
         return toHexString(uint256(uint160(account)), 20);
     }
 
+    // 將數值轉換為十六進制字串
     function toHexString(uint256 value, uint256 length) internal pure returns (string memory) {
         bytes16 _SYMBOLS = "0123456789abcdef";
         bytes memory buffer = new bytes(2 * length + 2);
@@ -618,6 +643,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return string(buffer);
     }
 
+    // 計算平方根
     function sqrt(uint256 x) internal pure returns (uint256) {
         if (x == 0) return 0;
         uint256 z = (x + 1) / 2;
