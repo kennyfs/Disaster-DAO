@@ -42,6 +42,16 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
     }
 
+    struct DonationRecord {
+        uint256 disasterId;
+        string name;
+        string donateAddress;
+        string image_cid;
+        uint256 total_amount;
+        uint256[] dates;
+        uint256 vote_per;
+    }
+
     mapping(uint256 => Disaster) public disasters;
     mapping(uint256 => NewProposal) public newProposals;
     mapping(uint256 => ProofProposal) public proofProposals;
@@ -404,6 +414,195 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             proposal.rejectVotes,
             proposal.votingDeadline
         );
+    }
+
+    function getMyDonationsCount() external view returns (uint256) {
+        uint256 count = 0;
+        for (uint256 i = 1; i <= disasterCount; i++) {
+            if (donations[i][msg.sender] > 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    function getMyDonations(uint256 from, uint256 to) external view returns (DonationRecord[] memory) {
+        require(from < to, "Invalid range");
+        require(to <= disasterCount, "Range exceeds disaster count");
+
+        // First count valid donations in range
+        uint256 count = 0;
+        for (uint256 i = from; i < to; i++) {
+            if (donations[i][msg.sender] > 0) {
+                count++;
+            }
+        }
+
+        DonationRecord[] memory records = new DonationRecord[](count);
+        uint256 index = 0;
+
+        // Fill records array
+        for (uint256 i = from; i < to; i++) {
+            if (donations[i][msg.sender] > 0) {
+                uint256[] memory datesArray = new uint256[](1);
+                datesArray[0] = block.timestamp; // Just using current time as example
+
+                records[index] = DonationRecord({
+                    disasterId: i,
+                    name: disasters[i].name,
+                    donateAddress: address(this).toString(),
+                    image_cid: disasters[i].photoCid,
+                    total_amount: donations[i][msg.sender],
+                    dates: datesArray,
+                    vote_per: votingPower[i][msg.sender]
+                });
+                index++;
+            }
+        }
+        return records;
+    }
+
+    function dueDisaster() external view returns (uint256[] memory) {
+        uint256[] memory dueDisasters = new uint256[](disasterCount);
+        uint256 count = 0;
+        
+        for (uint256 i = 1; i <= disasterCount; i++) {
+            if (block.timestamp > disasters[i].deadline) {
+                dueDisasters[count] = i;
+                count++;
+            }
+        }
+        
+        // Create correctly sized array
+        uint256[] memory result = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = dueDisasters[i];
+        }
+        return result;
+    }
+
+    function ongoingDisaster() external view returns (uint256[] memory) {
+        uint256[] memory activeDisasters = new uint256[](disasterCount);
+        uint256 count = 0;
+        
+        for (uint256 i = 1; i <= disasterCount; i++) {
+            if (block.timestamp <= disasters[i].deadline && disasters[i].active) {
+                activeDisasters[count] = i;
+                count++;
+            }
+        }
+        
+        uint256[] memory result = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = activeDisasters[i];
+        }
+        return result;
+    }
+
+    function unvoteProposal(uint256 disasterId) external view returns (uint256[] memory) {
+        uint256[] memory unvotedProposals = new uint256[](proofProposalCount);
+        uint256 count = 0;
+        
+        for (uint256 i = 1; i <= proofProposalCount; i++) {
+            if (proofProposals[i].disasterId == disasterId && 
+                !proofProposals[i].hasVoted[msg.sender] &&
+                block.timestamp <= proofProposals[i].votingDeadline) {
+                unvotedProposals[count] = i;
+                count++;
+            }
+        }
+        
+        uint256[] memory result = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = unvotedProposals[i];
+        }
+        return result;
+    }
+
+    function voteProposal(uint256 disasterId) external view returns (uint256[] memory) {
+        uint256[] memory votedProposals = new uint256[](proofProposalCount);
+        uint256 count = 0;
+        
+        for (uint256 i = 1; i <= proofProposalCount; i++) {
+            if (proofProposals[i].disasterId == disasterId && 
+                proofProposals[i].hasVoted[msg.sender]) {
+                votedProposals[count] = i;
+                count++;
+            }
+        }
+        
+        uint256[] memory result = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = votedProposals[i];
+        }
+        return result;
+    }
+
+    function ongoingProposal(uint256 disasterId) external view returns (uint256[] memory) {
+        uint256[] memory ongoingProposals = new uint256[](proofProposalCount);
+        uint256 count = 0;
+        
+        for (uint256 i = 1; i <= proofProposalCount; i++) {
+            if (proofProposals[i].disasterId == disasterId && 
+                !proofProposals[i].approved &&
+                block.timestamp <= proofProposals[i].votingDeadline) {
+                ongoingProposals[count] = i;
+                count++;
+            }
+        }
+        
+        uint256[] memory result = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = ongoingProposals[i];
+        }
+        return result;
+    }
+
+    function getProposalDetails(uint256 proposalId) external view returns (
+        uint256 id,
+        string memory title,
+        address creator,
+        uint256 startedDate,
+        uint256 dueDate,
+        bool canFinalize,
+        string memory previewCID,
+        string memory zipCID,
+        uint256 total_avail_count,
+        uint256 support_count,
+        uint256 reject_count
+    ) {
+        ProofProposal storage proposal = proofProposals[proposalId];
+        
+        return (
+            proposal.id,
+            proposal.title,
+            proposal.proposer,
+            proposal.votingDeadline - VOTING_PERIOD, // startedDate
+            proposal.votingDeadline,
+            !proposal.approved && block.timestamp > proposal.votingDeadline,
+            proposal.cid, // previewCID 
+            proposal.cid, // zipCID (in this case we use same CID)
+            votingPower[proposal.disasterId][msg.sender],
+            proposal.approveVotes,
+            proposal.rejectVotes
+        );
+    }
+
+    // Helper function to convert address to string
+    function toString(address account) internal pure returns (string memory) {
+        return toHexString(uint256(uint160(account)), 20);
+    }
+
+    function toHexString(uint256 value, uint256 length) internal pure returns (string memory) {
+        bytes16 _SYMBOLS = "0123456789abcdef";
+        bytes memory buffer = new bytes(2 * length + 2);
+        buffer[0] = "0";
+        buffer[1] = "x";
+        for (uint256 i = 2 * length + 1; i > 1; --i) {
+            buffer[i] = _SYMBOLS[value & 0xf];
+            value >>= 4;
+        }
+        return string(buffer);
     }
 
     function sqrt(uint256 x) internal pure returns (uint256) {
