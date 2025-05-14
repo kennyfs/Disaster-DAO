@@ -57,6 +57,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     mapping(uint256 => ProofProposal) public proofProposals;
     mapping(uint256 => mapping(address => uint256)) public donations;
     mapping(uint256 => mapping(address => uint256)) public votingPower;
+    mapping(address => bool) public admins; // New: Tracks admin addresses
     uint256 public disasterCount;
     uint256 public inactiveDisasterCount; // 因此 ID 為 inactiveDisasterCount+1 ~ disasterCount 的災難才是活躍災難
     // 要如何把災難設為不活躍？一樣做一個函數給人呼叫並給予獎勵？有沒有其他辦法？
@@ -93,10 +94,15 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 votingPower
     );
 
-    constructor() Ownable(msg.sender) {
+    constructor(address[] memory initialAdmins) Ownable(msg.sender) {
         disasterCount = 0;
         newProposalCount = 0;
         proofProposalCount = 0;
+
+        // Assign initial admins
+        for (uint256 i = 0; i < initialAdmins.length; i++) {
+            admins[initialAdmins[i]] = true;
+        }
     }
 
     function createDisaster(
@@ -137,25 +143,32 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     function voteNew(uint256 newProposalId, bool approve) external {
+        require(admins[msg.sender], "Only admins can vote"); // Restrict to admins
         NewProposal storage proposal = newProposals[newProposalId];
         require(
             block.timestamp <= proposal.votingDeadline,
             "Voting period ended"
         );
         require(!proposal.hasVoted[msg.sender], "Already voted");
-        uint256 totalVotingPower = 0;
-        for (uint256 i = 1; i <= disasterCount; i++) {
-            totalVotingPower += votingPower[i][msg.sender];
-        }
-        require(totalVotingPower > 0, "No voting power");
+
         proposal.hasVoted[msg.sender] = true;
         proposal.voteType[msg.sender] = approve; // Record the vote type
         if (approve) {
-            proposal.approveVotes += totalVotingPower;
+            proposal.approveVotes += 1; // Admins have one vote each
         } else {
-            proposal.rejectVotes += totalVotingPower;
+            proposal.rejectVotes += 1;
         }
         emit Voted(newProposalId, msg.sender, approve);
+    }
+
+    // Optional: Function to add new admins (only callable by the owner)
+    function addAdmin(address admin) external onlyOwner {
+        admins[admin] = true;
+    }
+
+    // Optional: Function to remove admins (only callable by the owner)
+    function removeAdmin(address admin) external onlyOwner {
+        admins[admin] = false;
     }
 
     function voteProof(uint256 proofProposalId, bool approve) external {
