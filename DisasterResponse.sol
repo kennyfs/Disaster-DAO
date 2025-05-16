@@ -12,6 +12,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 deadline; // 可以固定為開始日期起 6 個月之類的，方便實作
         uint256 totalDonations;
         bool active;
+        uint256 totalVotes; // 新增：每個災難的總投票權
     }
 
     struct Request {
@@ -58,6 +59,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => uint256)) public donations;
     mapping(uint256 => mapping(address => uint256)) public votingPower;
     mapping(address => bool) public admins; // New: Tracks admin addresses
+    address[] public adminList; // 新增：admin array
     uint256 public disasterCount;
     uint256 public inactiveDisasterCount; // 因此 ID 為 inactiveDisasterCount+1 ~ disasterCount 的災難才是活躍災難
     // 要如何把災難設為不活躍？一樣做一個函數給人呼叫並給予獎勵？有沒有其他辦法？
@@ -102,7 +104,11 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
         // 設定初始管理員
         for (uint256 i = 0; i < initialAdmins.length; i++) {
-            admins[initialAdmins[i]] = true;
+            address admin = initialAdmins[i];
+            if (!admins[admin]) {
+                admins[admin] = true;
+                adminList.push(admin);
+            }
         }
     }
 
@@ -167,12 +173,25 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     // 新增管理員（僅限合約擁有者）
     function addAdmin(address admin) external onlyOwner {
-        admins[admin] = true;
+        if (!admins[admin]) {
+            admins[admin] = true;
+            adminList.push(admin);
+        }
     }
 
     // 移除管理員（僅限合約擁有者）
     function removeAdmin(address admin) external onlyOwner {
-        admins[admin] = false;
+        if (admins[admin]) {
+            admins[admin] = false;
+            // 從 adminList 移除
+            for (uint256 i = 0; i < adminList.length; i++) {
+                if (adminList[i] == admin) {
+                    adminList[i] = adminList[adminList.length - 1];
+                    adminList.pop();
+                    break;
+                }
+            }
+        }
     }
 
     // 對災難的請款提案進行投票
@@ -209,7 +228,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             "Voting period not ended"
         );
         require(!request.approved, "Already finalized");
-        uint256 totalVotes = request.approveVotes + request.rejectVotes;
+        // 以 admin 數量作為總票數
+        uint256 totalVotes = getAdminCount();
         bool passed = request.approveVotes > request.rejectVotes &&
             totalVotes > 0 &&
             (request.approveVotes * 100) / totalVotes >= MIN_APPROVE_RATIO_NEW;
@@ -220,7 +240,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 request.cid,
                 block.timestamp + 30 days, // 假設災難持續 30 天
                 0,
-                true
+                true,
+                0
             );
             payable(request.proposer).transfer(stakeAmount + newRewardAmount);
             emit DisasterCreated(disasterCount);
@@ -228,6 +249,11 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             payable(request.proposer).transfer((stakeAmount * 9) / 10);
         }
         request.approved = true;
+    }
+
+    // 計算 admin 數量
+    function getAdminCount() public view returns (uint256) {
+        return adminList.length;
     }
 
     // 最終化請款提案，根據投票結果決定是否通過
@@ -238,8 +264,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             "Voting period not ended"
         );
         require(!proposal.approved, "Already approved");
-        uint256 totalVotes = proposal.approveVotes + proposal.rejectVotes;
+        // 直接用 disasters[disasterId].totalVotes
+        uint256 totalVotes = disasters[proposal.disasterId].totalVotes;
         bool passed = proposal.approveVotes > proposal.rejectVotes &&
+            totalVotes > 0 &&
             (proposal.approveVotes * 100) / totalVotes >= MIN_APPROVE_RATIO_PROOF;
         require(passed, "Not enough votes");
         uint256 amount = proposal.amount;
@@ -264,6 +292,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 previousVotingPower = votingPower[disasterId][msg.sender];
         uint256 newVotingPower = sqrt(donations[disasterId][msg.sender] / 1e18);
         votingPower[disasterId][msg.sender] = newVotingPower;
+
+        // 只會增加投票權
+        disasters[disasterId].totalVotes += (newVotingPower - previousVotingPower);
 
         // Adjust votes if the donor has already voted for proof proposals
         for (uint256 i = 1; i <= proofProposalCount; i++) {
