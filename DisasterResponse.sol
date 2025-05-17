@@ -623,7 +623,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         for (uint256 i = 1; i <= proposalCount; i++) {
             if (
                 proposals[i].disasterId == disasterId &&
-                !proposals[i].hasVoted[msg.sender] &&
+                !proposalHasVoted[i][msg.sender] && // <-- use mapping, not struct member
                 block.timestamp <= proposals[i].votingDeadline
             ) {
                 unvotedProposals[count] = i;
@@ -648,7 +648,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         for (uint256 i = 1; i <= proposalCount; i++) {
             if (
                 proposals[i].disasterId == disasterId &&
-                proposals[i].hasVoted[msg.sender]
+                proposalHasVoted[i][msg.sender]
             ) {
                 votedProposals[count] = i;
                 count++;
@@ -716,8 +716,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             proposal.votingDeadline - VOTING_PERIOD, // startedDate
             proposal.votingDeadline,
             !proposal.approved && block.timestamp > proposal.votingDeadline,
-            proposal.cid, // previewCID
-            proposal.cid, // zipCID (in this case we use same CID)
+            proposal.photoCid, // previewCID
+            proposal.photoCid, // zipCID (in this case we use same CID)
             votingPower[proposal.disasterId][msg.sender],
             proposal.approveVotes,
             proposal.rejectVotes
