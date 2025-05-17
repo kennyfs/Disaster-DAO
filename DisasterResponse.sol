@@ -113,7 +113,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 創建新的災難請求
-    function createDisaster(
+    function addRequest(
         string memory title,
         string memory cid,
         uint256 deadline
@@ -342,7 +342,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶可以投票的災難 ID 列表
-    function canVoteDisaster(
+    function getVotableDisaster(
         address voter
     ) external view returns (uint256[] memory) {
         uint256[] memory votableDisasters = new uint256[](disasterCount);
@@ -361,7 +361,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶可以投票的災難請求
-    function getVoteableRequests()
+    function getVotableRequests()
         external
         view
         returns (Request[] memory)
@@ -387,7 +387,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取指定災難的可投票請款提案
-    function getVoteableProposals(
+    function getVotableProposals(
         uint256 disasterId
     ) external view returns (Proposal[] memory) {
         Proposal[] memory votableProposals = new Proposal[](
@@ -524,7 +524,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取已到期的災難 ID 列表
-    function dueDisaster() external view returns (uint256[] memory) {
+    function getDueDisaster() external view returns (uint256[] memory) {
         uint256[] memory dueDisasters = new uint256[](disasterCount);
         uint256 count = 0;
         
@@ -544,7 +544,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取正在進行中的災難 ID 列表
-    function ongoingDisaster() external view returns (uint256[] memory) {
+    function getOngoingDisaster() external view returns (uint256[] memory) {
         uint256[] memory activeDisasters = new uint256[](disasterCount);
         uint256 count = 0;
         
@@ -563,7 +563,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶未投票的請款提案 ID 列表
-    function unvoteProposal(uint256 disasterId) external view returns (uint256[] memory) {
+    function getUnvoteProposal(uint256 disasterId) external view returns (uint256[] memory) {
         uint256[] memory unvotedProposals = new uint256[](proposalCount);
         uint256 count = 0;
         
@@ -584,7 +584,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶已投票的請款提案 ID 列表
-    function votedProposal(uint256 disasterId) external view returns (uint256[] memory) {
+    function getVotedProposal(uint256 disasterId) external view returns (uint256[] memory) {
         uint256[] memory votedProposals = new uint256[](proposalCount);
         uint256 count = 0;
         
@@ -604,7 +604,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取正在進行中的請款提案 ID 列表
-    function ongoingProposal(uint256 disasterId) external view returns (uint256[] memory) {
+    function getOngoingProposal(uint256 disasterId) external view returns (uint256[] memory) {
         uint256[] memory ongoingProposals = new uint256[](proposalCount);
         uint256 count = 0;
         
