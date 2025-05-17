@@ -27,8 +27,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 rejectVotes;
         uint256 votingDeadline;
         address residualAddress;
-        mapping(address => bool) hasVoted; // Replace this
-        mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
+        // mapping(address => bool) hasVoted; // Replace this
+        // mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
     }
 
     struct Proposal {
@@ -45,17 +45,14 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 approveVotes;
         uint256 rejectVotes;
         uint256 votingDeadline;
-        mapping(address => bool) hasVoted;
-        mapping(address => bool) voteType;
+        // mapping(address => bool) hasVoted; // moved out
+        // mapping(address => bool) voteType; // moved out
     }
 
     struct DonationRecord {
         uint256 disasterId;
         string name;
-        string donateAddress;
-        string image_cid;
         uint256 total_amount;
-        uint256[] dates;
         uint256 vote_per;
     }
 
@@ -162,10 +159,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             block.timestamp <= request.votingDeadline,
             "Voting period ended"
         );
-        require(!request.hasVoted[msg.sender], "Already voted");
+        require(!requestHasVoted[requestId][msg.sender], "Already voted");
 
-        request.hasVoted[msg.sender] = true;
-        request.voteType[msg.sender] = approve; // Record the vote type
+        requestHasVoted[requestId][msg.sender] = true;
+        requestVoteType[requestId][msg.sender] = approve; // Record the vote type
         if (approve) {
             request.approveVotes += 1; // Admins have one vote each
         } else {
@@ -235,7 +232,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 提交災難的請款證明
-    function submitProof(
+    function submitProposal(
         uint256 disasterId,
         string memory title,
         uint256 amount,
@@ -247,9 +244,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             block.timestamp <= disasters[disasterId].deadline,
             "Disaster not active"
         );
-        proofProposalCount++;
-        ProofProposal storage proposal = proofProposals[proofProposalCount];
-        proposal.id = proofProposalCount;
+        proposalCount++;
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
         proposal.disasterId = disasterId;
         proposal.title = title;
         proposal.photoCid = photoCid;
@@ -262,23 +259,23 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         proposal.rejectVotes = 0;
         proposal.votingDeadline = block.timestamp + VOTING_PERIOD;
 
-        emit ProofProposed(proofProposalCount, disasterId, msg.sender, title);
+        emit ProposalProposed(proposalCount, disasterId, msg.sender, title);
     }
 
     // 對災難的請款提案進行投票
-    function voteProof(uint256 proofProposalId, bool approve) external {
-        ProofProposal storage proposal = proofProposals[proofProposalId];
+    function voteProposal(uint256 proposalId, bool approve) external {
+        Proposal storage proposal = proposals[proposalId];
         require(
             block.timestamp <= proposal.votingDeadline,
             "Voting period ended"
         );
-        require(!proposal.hasVoted[msg.sender], "Already voted");
+        require(!proposalHasVoted[proposalId][msg.sender], "Already voted");
         require(
             votingPower[proposal.disasterId][msg.sender] > 0,
             "No voting power for this disaster"
         );
-        proposal.hasVoted[msg.sender] = true;
-        proposal.voteType[msg.sender] = approve; // Record the vote type
+        proposalHasVoted[proposalId][msg.sender] = true;
+        proposalVoteType[proposalId][msg.sender] = approve; // Record the vote type
         if (approve) {
             proposal.approveVotes += votingPower[proposal.disasterId][
                 msg.sender
@@ -288,12 +285,12 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 msg.sender
             ];
         }
-        emit ProofVoted(proofProposalId, msg.sender, approve);
+        emit ProposalVoted(proposalId, msg.sender, approve);
     }
 
     // 最終化請款提案，根據投票結果決定是否通過
     function finalizeProposal(uint256 proposalId) external nonReentrant {
-        ProofProposal storage proposal = proofProposals[proposalId];
+        Proposal storage proposal = proposals[proposalId];
         require(block.timestamp > TIMELOCK, "Timelock not reached.");
         require(!proposal.approved, "Already approved");
         uint256 totalVotes = disasters[proposal.disasterId].totalVotes;
@@ -307,7 +304,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         // 任何交易的 Gas fee 都由交易發起人負擔，而不是合約負擔，因此只要合約餘額足夠就可以了。
         payable(proposal.proposer).transfer(amount);
         proposal.approved = true;
-        emit ProofApproved(proposalId);
+        emit ProposalApproved(proposalId);
     }
 
     // 捐款給指定的災難
@@ -350,16 +347,14 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         for (uint256 i = 1; i <= proposalCount; i++) {
             if (
                 proposals[i].disasterId == disasterId &&
-                proposals[i].hasVoted[voter]
+                proposalHasVoted[i][voter]
             ) {
-                if (proposals[i].voteType[voter]) {
-                    // Adjust approve votes
+                if (proposalVoteType[i][voter]) {
                     proposals[i].approveVotes =
                         proposals[i].approveVotes -
                         previousVotingPower +
                         newVotingPower;
                 } else {
-                    // Adjust reject votes
                     proposals[i].rejectVotes =
                         proposals[i].rejectVotes -
                         previousVotingPower +
@@ -491,7 +486,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return (
             request.id,
             request.title,
-            request.cid,
+            request.photoCid,
             request.proposer,
             request.approved,
             request.approveVotes,
@@ -524,7 +519,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             proposal.id,
             proposal.disasterId,
             proposal.title,
-            proposal.cid,
+            proposal.photoCid,
             proposal.amount,
             proposal.proposer,
             proposal.approved,
@@ -567,16 +562,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         // Fill records array
         for (uint256 i = from; i < to; i++) {
             if (donations[i][msg.sender] > 0) {
-                uint256[] memory datesArray = new uint256[](1);
-                datesArray[0] = block.timestamp; // Just using current time as example
-
                 records[index] = DonationRecord({
                     disasterId: i,
                     name: disasters[i].name,
-                    donateAddress: address(this).toString(),
-                    image_cid: disasters[i].photoCid,
                     total_amount: donations[i][msg.sender],
-                    dates: datesArray,
                     vote_per: votingPower[i][msg.sender]
                 });
                 index++;
@@ -767,4 +756,12 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         }
         return y;
     }
+
+    // 新增：Request 投票相關 mapping
+    mapping(uint256 => mapping(address => bool)) public requestHasVoted;
+    mapping(uint256 => mapping(address => bool)) public requestVoteType;
+
+    // 新增：Proposal 投票相關 mapping
+    mapping(uint256 => mapping(address => bool)) public proposalHasVoted;
+    mapping(uint256 => mapping(address => bool)) public proposalVoteType;
 }
