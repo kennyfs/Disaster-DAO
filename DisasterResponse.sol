@@ -28,7 +28,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
     }
 
-    struct ProofProposal {
+    struct Proposal {
         uint256 id;
         uint256 disasterId;
         string title;
@@ -39,8 +39,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 approveVotes;
         uint256 rejectVotes;
         uint256 votingDeadline;
-        mapping(address => bool) hasVoted; // Replace this
-        mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
+        mapping(address => bool) hasVoted;
+        mapping(address => bool) voteType;
     }
 
     struct DonationRecord {
@@ -55,7 +55,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     mapping(uint256 => Disaster) public disasters;
     mapping(uint256 => Request) public requests;
-    mapping(uint256 => ProofProposal) public proofProposals;
+    mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => uint256)) public donations;
     mapping(uint256 => mapping(address => uint256)) public votingPower;
     mapping(address => bool) public admins; // New: Tracks admin addresses
@@ -64,7 +64,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     uint256 public inactiveDisasterCount; // 因此 ID 為 inactiveDisasterCount+1 ~ disasterCount 的災難才是活躍災難
     // 要如何把災難設為不活躍？一樣做一個函數給人呼叫並給予獎勵？有沒有其他辦法？
     uint256 public requestCount;
-    uint256 public proofProposalCount;
+    uint256 public proposalCount;
     uint256 public stakeAmount = 0.1 ether;
     uint256 public newRewardAmount = 0.005 ether;
     uint256 public finalizeRewardAmount = 0.001 ether;
@@ -78,7 +78,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         string title,
         uint256 deadline
     );
-    event ProofProposed(
+    event ProposalProposed(
         uint256 indexed proposalId,
         uint256 disasterId,
         address proposer,
@@ -86,7 +86,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     );
     event Voted(uint256 indexed proposalId, address voter, bool approve);
     event DisasterCreated(uint256 indexed disasterId);
-    event ProofApproved(
+    event ProposalApproved(
         uint256 indexed proposalId
     );
     event Donated(
@@ -100,7 +100,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         // 初始化合約，設定初始管理員
         disasterCount = 0;
         requestCount = 0;
-        proofProposalCount = 0;
+        proposalCount = 0;
 
         // 設定初始管理員
         for (uint256 i = 0; i < initialAdmins.length; i++) {
@@ -131,16 +131,16 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 提交災難的請款證明
-    function submitProof(
+    function submitProposal(
         uint256 disasterId,
         string memory title,
         string memory cid,
         uint256 amount
     ) external {
         require(disasters[disasterId].active, "Disaster not active");
-        proofProposalCount++;
-        ProofProposal storage proposal = proofProposals[proofProposalCount];
-        proposal.id = proofProposalCount;
+        proposalCount++;
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
         proposal.disasterId = disasterId;
         proposal.title = title;
         proposal.cid = cid;
@@ -148,7 +148,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         proposal.proposer = msg.sender;
         proposal.approved = false;
         proposal.votingDeadline = block.timestamp + VOTING_PERIOD;
-        emit ProofProposed(proofProposalCount, disasterId, msg.sender, title);
+        emit ProposalProposed(proposalCount, disasterId, msg.sender, title);
     }
 
     // 管理員對災難請求進行投票
@@ -195,8 +195,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 對災難的請款提案進行投票
-    function voteProof(uint256 proofProposalId, bool approve) external {
-        ProofProposal storage proposal = proofProposals[proofProposalId];
+    function voteProposal(uint256 proposalId, bool approve) external {
+        Proposal storage proposal = proposals[proposalId];
         require(
             block.timestamp <= proposal.votingDeadline,
             "Voting period ended"
@@ -217,7 +217,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 msg.sender
             ];
         }
-        emit Voted(proofProposalId, msg.sender, approve);
+        emit Voted(proposalId, msg.sender, approve);
     }
 
     // 最終化災難請求，根據投票結果決定是否通過
@@ -257,14 +257,13 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 最終化請款提案，根據投票結果決定是否通過
-    function approveProof(uint256 proposalId) external nonReentrant {
-        ProofProposal storage proposal = proofProposals[proposalId];
+    function approveProposal(uint256 proposalId) external nonReentrant {
+        Proposal storage proposal = proposals[proposalId];
         require(
             block.timestamp > proposal.votingDeadline,
             "Voting period not ended"
         );
         require(!proposal.approved, "Already approved");
-        // 直接用 disasters[disasterId].totalVotes
         uint256 totalVotes = disasters[proposal.disasterId].totalVotes;
         bool passed = proposal.approveVotes > proposal.rejectVotes &&
             totalVotes > 0 &&
@@ -274,7 +273,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         require(address(this).balance >= amount, "Insufficient funds");
         payable(proposal.proposer).transfer(amount);
         proposal.approved = true;
-        emit ProofApproved(
+        emit ProposalApproved(
             proposalId
         );
     }
@@ -297,21 +296,21 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         disasters[disasterId].totalVotes += (newVotingPower - previousVotingPower);
 
         // Adjust votes if the donor has already voted for proof proposals
-        for (uint256 i = 1; i <= proofProposalCount; i++) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
             if (
-                proofProposals[i].disasterId == disasterId &&
-                proofProposals[i].hasVoted[msg.sender]
+                proposals[i].disasterId == disasterId &&
+                proposals[i].hasVoted[msg.sender]
             ) {
-                if (proofProposals[i].voteType[msg.sender]) {
+                if (proposals[i].voteType[msg.sender]) {
                     // Adjust approve votes
-                    proofProposals[i].approveVotes =
-                        proofProposals[i].approveVotes -
+                    proposals[i].approveVotes =
+                        proposals[i].approveVotes -
                         previousVotingPower +
                         newVotingPower;
                 } else {
                     // Adjust reject votes
-                    proofProposals[i].rejectVotes =
-                        proofProposals[i].rejectVotes -
+                    proposals[i].rejectVotes =
+                        proposals[i].rejectVotes -
                         previousVotingPower +
                         newVotingPower;
                 }
@@ -388,24 +387,24 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取指定災難的可投票請款提案
-    function getVoteableProofProposals(
+    function getVoteableProposals(
         uint256 disasterId
-    ) external view returns (ProofProposal[] memory) {
-        ProofProposal[] memory votableProposals = new ProofProposal[](
-            proofProposalCount
+    ) external view returns (Proposal[] memory) {
+        Proposal[] memory votableProposals = new Proposal[](
+            proposalCount
         );
         uint256 count = 0;
-        for (uint256 i = 1; i <= proofProposalCount; i++) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
             if (
-                proofProposals[i].disasterId == disasterId &&
-                !proofProposals[i].approved &&
-                block.timestamp <= proofProposals[i].votingDeadline
+                proposals[i].disasterId == disasterId &&
+                !proposals[i].approved &&
+                block.timestamp <= proposals[i].votingDeadline
             ) {
-                votableProposals[count] = proofProposals[i];
+                votableProposals[count] = proposals[i];
                 count++;
             }
         }
-        ProofProposal[] memory result = new ProofProposal[](count);
+        Proposal[] memory result = new Proposal[](count);
         for (uint256 i = 0; i < count; i++) {
             result[i] = votableProposals[i];
         }
@@ -443,7 +442,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取指定請款提案的詳情
-    function getProofProposal(
+    function getProposal(
         uint256 proposalId
     )
         external
@@ -461,7 +460,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             uint256 votingDeadline
         )
     {
-        ProofProposal storage proposal = proofProposals[proposalId];
+        Proposal storage proposal = proposals[proposalId];
         return (
             proposal.id,
             proposal.disasterId,
@@ -565,13 +564,13 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     // 獲取用戶未投票的請款提案 ID 列表
     function unvoteProposal(uint256 disasterId) external view returns (uint256[] memory) {
-        uint256[] memory unvotedProposals = new uint256[](proofProposalCount);
+        uint256[] memory unvotedProposals = new uint256[](proposalCount);
         uint256 count = 0;
         
-        for (uint256 i = 1; i <= proofProposalCount; i++) {
-            if (proofProposals[i].disasterId == disasterId && 
-                !proofProposals[i].hasVoted[msg.sender] &&
-                block.timestamp <= proofProposals[i].votingDeadline) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
+            if (proposals[i].disasterId == disasterId && 
+                !proposals[i].hasVoted[msg.sender] &&
+                block.timestamp <= proposals[i].votingDeadline) {
                 unvotedProposals[count] = i;
                 count++;
             }
@@ -585,13 +584,13 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶已投票的請款提案 ID 列表
-    function voteProposal(uint256 disasterId) external view returns (uint256[] memory) {
-        uint256[] memory votedProposals = new uint256[](proofProposalCount);
+    function votedProposal(uint256 disasterId) external view returns (uint256[] memory) {
+        uint256[] memory votedProposals = new uint256[](proposalCount);
         uint256 count = 0;
         
-        for (uint256 i = 1; i <= proofProposalCount; i++) {
-            if (proofProposals[i].disasterId == disasterId && 
-                proofProposals[i].hasVoted[msg.sender]) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
+            if (proposals[i].disasterId == disasterId && 
+                proposals[i].hasVoted[msg.sender]) {
                 votedProposals[count] = i;
                 count++;
             }
@@ -606,13 +605,13 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     // 獲取正在進行中的請款提案 ID 列表
     function ongoingProposal(uint256 disasterId) external view returns (uint256[] memory) {
-        uint256[] memory ongoingProposals = new uint256[](proofProposalCount);
+        uint256[] memory ongoingProposals = new uint256[](proposalCount);
         uint256 count = 0;
         
-        for (uint256 i = 1; i <= proofProposalCount; i++) {
-            if (proofProposals[i].disasterId == disasterId && 
-                !proofProposals[i].approved &&
-                block.timestamp <= proofProposals[i].votingDeadline) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
+            if (proposals[i].disasterId == disasterId && 
+                !proposals[i].approved &&
+                block.timestamp <= proposals[i].votingDeadline) {
                 ongoingProposals[count] = i;
                 count++;
             }
@@ -639,7 +638,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 support_count,
         uint256 reject_count
     ) {
-        ProofProposal storage proposal = proofProposals[proposalId];
+        Proposal storage proposal = proposals[proposalId];
         
         return (
             proposal.id,
