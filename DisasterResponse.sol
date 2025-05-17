@@ -94,10 +94,13 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         string title
     );
     event DisasterVoted(uint256 indexed requestId, address voter, bool approve);
-    event ProposalVoted(uint256 indexed proposalId, address voter, bool approve);
-    event DisasterCreated(uint256 indexed disasterId);
-    event ProposalApproved(uint256 indexed proposalId
+    event ProposalVoted(
+        uint256 indexed proposalId,
+        address voter,
+        bool approve
     );
+    event DisasterCreated(uint256 indexed disasterId);
+    event ProposalApproved(uint256 indexed proposalId);
     event Donated(
         uint256 indexed disasterId,
         address indexed donor,
@@ -321,11 +324,14 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
         // Calculate new voting power
         uint256 previousVotingPower = votingPower[disasterId][msg.sender];
-        uint256 newVotingPower = sqrt(donations[disasterId][msg.sender] / VOTING_POWER_BASE);
+        uint256 newVotingPower = sqrt(
+            donations[disasterId][msg.sender] / VOTING_POWER_BASE
+        );
         votingPower[disasterId][msg.sender] = newVotingPower;
 
         // 只會增加投票權
-        disasters[disasterId].totalVotes += (newVotingPower - previousVotingPower);
+        disasters[disasterId].totalVotes += (newVotingPower -
+            previousVotingPower);
 
         // 調整已投票提案的 approve/reject votes
         // 但我覺得不太必要
@@ -421,14 +427,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶可以投票的災難請求
-    function getVotableRequests()
-        external
-        view
-        returns (Request[] memory)
-    {
-        Request[] memory votableRequests = new Request[](
-            requestCount
-        );
+    function getVotableRequests() external view returns (Request[] memory) {
+        Request[] memory votableRequests = new Request[](requestCount);
         uint256 count = 0;
         for (uint256 i = 1; i <= requestCount; i++) {
             if (
@@ -450,9 +450,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     function getVotableProposals(
         uint256 disasterId
     ) external view returns (Proposal[] memory) {
-        Proposal[] memory votableProposals = new Proposal[](
-            proposalCount
-        );
+        Proposal[] memory votableProposals = new Proposal[](proposalCount);
         uint256 count = 0;
         for (uint256 i = 1; i <= proposalCount; i++) {
             if (
@@ -548,7 +546,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶的捐款記錄
-    function getMyDonations(uint256 from, uint256 to) external view returns (DonationRecord[] memory) {
+    function getMyDonations(
+        uint256 from,
+        uint256 to
+    ) external view returns (DonationRecord[] memory) {
         require(from < to, "Invalid range");
         require(to <= disasterCount, "Range exceeds disaster count");
 
@@ -588,14 +589,14 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     function getDueDisaster() external view returns (uint256[] memory) {
         uint256[] memory dueDisasters = new uint256[](disasterCount);
         uint256 count = 0;
-        
+
         for (uint256 i = 1; i <= disasterCount; i++) {
             if (block.timestamp > disasters[i].deadline) {
                 dueDisasters[count] = i;
                 count++;
             }
         }
-        
+
         // Create correctly sized array
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
@@ -608,14 +609,14 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     function getOngoingDisaster() external view returns (uint256[] memory) {
         uint256[] memory activeDisasters = new uint256[](disasterCount);
         uint256 count = 0;
-        
+
         for (uint256 i = 1; i <= disasterCount; i++) {
             if (block.timestamp <= disasters[i].deadline) {
                 activeDisasters[count] = i;
                 count++;
             }
         }
-        
+
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
             result[i] = activeDisasters[i];
@@ -624,19 +625,23 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶未投票的請款提案 ID 列表
-    function getUnvoteProposal(uint256 disasterId) external view returns (uint256[] memory) {
+    function getUnvoteProposal(
+        uint256 disasterId
+    ) external view returns (uint256[] memory) {
         uint256[] memory unvotedProposals = new uint256[](proposalCount);
         uint256 count = 0;
-        
+
         for (uint256 i = 1; i <= proposalCount; i++) {
-            if (proposals[i].disasterId == disasterId && 
+            if (
+                proposals[i].disasterId == disasterId &&
                 !proposals[i].hasVoted[msg.sender] &&
-                block.timestamp <= proposals[i].votingDeadline) {
+                block.timestamp <= proposals[i].votingDeadline
+            ) {
                 unvotedProposals[count] = i;
                 count++;
             }
         }
-        
+
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
             result[i] = unvotedProposals[i];
@@ -645,18 +650,22 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取用戶已投票的請款提案 ID 列表
-    function getVotedProposal(uint256 disasterId) external view returns (uint256[] memory) {
+    function getVotedProposal(
+        uint256 disasterId
+    ) external view returns (uint256[] memory) {
         uint256[] memory votedProposals = new uint256[](proposalCount);
         uint256 count = 0;
-        
+
         for (uint256 i = 1; i <= proposalCount; i++) {
-            if (proposals[i].disasterId == disasterId && 
-                proposals[i].hasVoted[msg.sender]) {
+            if (
+                proposals[i].disasterId == disasterId &&
+                proposals[i].hasVoted[msg.sender]
+            ) {
                 votedProposals[count] = i;
                 count++;
             }
         }
-        
+
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
             result[i] = votedProposals[i];
@@ -665,19 +674,23 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取正在進行中的請款提案 ID 列表
-    function getOngoingProposal(uint256 disasterId) external view returns (uint256[] memory) {
+    function getOngoingProposal(
+        uint256 disasterId
+    ) external view returns (uint256[] memory) {
         uint256[] memory ongoingProposals = new uint256[](proposalCount);
         uint256 count = 0;
-        
+
         for (uint256 i = 1; i <= proposalCount; i++) {
-            if (proposals[i].disasterId == disasterId && 
+            if (
+                proposals[i].disasterId == disasterId &&
                 !proposals[i].approved &&
-                block.timestamp <= proposals[i].votingDeadline) {
+                block.timestamp <= proposals[i].votingDeadline
+            ) {
                 ongoingProposals[count] = i;
                 count++;
             }
         }
-        
+
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
             result[i] = ongoingProposals[i];
@@ -686,21 +699,27 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取指定請款提案的詳細資訊
-    function getProposalDetails(uint256 proposalId) external view returns (
-        uint256 id,
-        string memory title,
-        address creator,
-        uint256 startedDate,
-        uint256 dueDate,
-        bool canFinalize,
-        string memory previewCID,
-        string memory zipCID,
-        uint256 total_avail_count,
-        uint256 support_count,
-        uint256 reject_count
-    ) {
+    function getProposalDetails(
+        uint256 proposalId
+    )
+        external
+        view
+        returns (
+            uint256 id,
+            string memory title,
+            address creator,
+            uint256 startedDate,
+            uint256 dueDate,
+            bool canFinalize,
+            string memory previewCID,
+            string memory zipCID,
+            uint256 total_avail_count,
+            uint256 support_count,
+            uint256 reject_count
+        )
+    {
         Proposal storage proposal = proposals[proposalId];
-        
+
         return (
             proposal.id,
             proposal.title,
@@ -708,7 +727,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             proposal.votingDeadline - VOTING_PERIOD, // startedDate
             proposal.votingDeadline,
             !proposal.approved && block.timestamp > proposal.votingDeadline,
-            proposal.cid, // previewCID 
+            proposal.cid, // previewCID
             proposal.cid, // zipCID (in this case we use same CID)
             votingPower[proposal.disasterId][msg.sender],
             proposal.approveVotes,
@@ -722,7 +741,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 將數值轉換為十六進制字串
-    function toHexString(uint256 value, uint256 length) internal pure returns (string memory) {
+    function toHexString(
+        uint256 value,
+        uint256 length
+    ) internal pure returns (string memory) {
         bytes16 _SYMBOLS = "0123456789abcdef";
         bytes memory buffer = new bytes(2 * length + 2);
         buffer[0] = "0";
