@@ -71,6 +71,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     uint256 public constant VOTING_PERIOD = 3 days;
     uint256 public constant MIN_APPROVE_RATIO_NEW = 5; // 新增災難同意票需達總票數 5%，因為先前的捐款者可能沒有活躍關注此 DAO。
     uint256 public constant MIN_APPROVE_RATIO_PROOF = 25; // 請款同意票需達總票數 1/4
+    uint256 public constant VOTING_POWER_BASE = 1e18; // 新增：投票權基準單位
+    uint256 public constant DEFAULT_DISASTER_DURATION = 30 days; // 新增：預設災難持續天數
 
     event DisasterRequested(
         uint256 indexed requestId,
@@ -101,6 +103,12 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         disasterCount = 0;
         requestCount = 0;
         proposalCount = 0;
+
+        // 自動將合約部署者設為管理員
+        if (!admins[msg.sender]) {
+            admins[msg.sender] = true;
+            adminList.push(msg.sender);
+        }
 
         // 設定初始管理員
         for (uint256 i = 0; i < initialAdmins.length; i++) {
@@ -238,7 +246,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             disasters[disasterCount] = Disaster(
                 request.title,
                 request.cid,
-                block.timestamp + 30 days, // 假設災難持續 30 天
+                block.timestamp + DEFAULT_DISASTER_DURATION, // 使用常數
                 0,
                 true,
                 0
@@ -289,19 +297,31 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
         // Calculate new voting power
         uint256 previousVotingPower = votingPower[disasterId][msg.sender];
-        uint256 newVotingPower = sqrt(donations[disasterId][msg.sender] / 1e18);
+        uint256 newVotingPower = sqrt(donations[disasterId][msg.sender] / VOTING_POWER_BASE);
         votingPower[disasterId][msg.sender] = newVotingPower;
 
         // 只會增加投票權
         disasters[disasterId].totalVotes += (newVotingPower - previousVotingPower);
 
-        // Adjust votes if the donor has already voted for proof proposals
+        // 調整已投票提案的 approve/reject votes
+        adjustProposalVotes(disasterId, msg.sender, previousVotingPower, newVotingPower);
+
+        emit Donated(disasterId, msg.sender, msg.value, newVotingPower);
+    }
+
+    // 調整已投票提案的 approve/reject votes
+    function adjustProposalVotes(
+        uint256 disasterId,
+        address voter,
+        uint256 previousVotingPower,
+        uint256 newVotingPower
+    ) internal {
         for (uint256 i = 1; i <= proposalCount; i++) {
             if (
                 proposals[i].disasterId == disasterId &&
-                proposals[i].hasVoted[msg.sender]
+                proposals[i].hasVoted[voter]
             ) {
-                if (proposals[i].voteType[msg.sender]) {
+                if (proposals[i].voteType[voter]) {
                     // Adjust approve votes
                     proposals[i].approveVotes =
                         proposals[i].approveVotes -
@@ -316,8 +336,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 }
             }
         }
-
-        emit Donated(disasterId, msg.sender, msg.value, newVotingPower);
     }
 
     // 獲取災難總數
@@ -348,7 +366,11 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256[] memory votableDisasters = new uint256[](disasterCount);
         uint256 count = 0;
         for (uint256 i = 1; i <= disasterCount; i++) {
-            if (votingPower[i][voter] > 0) {
+            if (
+                votingPower[i][voter] > 0 &&
+                disasters[i].active &&
+                block.timestamp <= disasters[i].deadline
+            ) {
                 votableDisasters[count] = i;
                 count++;
             }
@@ -398,7 +420,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             if (
                 proposals[i].disasterId == disasterId &&
                 !proposals[i].approved &&
-                block.timestamp <= proposals[i].votingDeadline
+                block.timestamp <= proposals[i].votingDeadline &&
+                disasters[disasterId].active &&
+                block.timestamp <= disasters[disasterId].deadline
             ) {
                 votableProposals[count] = proposals[i];
                 count++;
