@@ -218,7 +218,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 0,
                 request.residualAddress
             );
-            payable(request.proposer).transfer(stakeAmount + newRewardAmount);
+            uint256 returnAmount = (address(this).balance < stakeAmount + newRewardAmount) ? address(this).balance : stakeAmount + newRewardAmount;
+            payable(request.proposer).transfer(returnAmount);
             emit DisasterCreated(disasterCount);
         } else {
             payable(request.proposer).transfer((stakeAmount * 9) / 10);
