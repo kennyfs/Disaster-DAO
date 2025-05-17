@@ -332,7 +332,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
         // 調整已投票提案的 approve/reject votes
         // 但我覺得不太必要
-        // adjustProposalVotes(disasterId, msg.sender, previousVotingPower, newVotingPower);
+        adjustProposalVotes(disasterId, msg.sender, previousVotingPower, newVotingPower);
 
         emit Donated(disasterId, msg.sender, msg.value, newVotingPower);
     }
