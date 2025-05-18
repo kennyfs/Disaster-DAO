@@ -728,41 +728,49 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         return result;
     }
 
-    // 獲取指定請款提案的詳細資訊
     function getProposalDetails(
         uint256 proposalId
     )
         external 
         view
         returns (
-            address creator,            // 修改: 從 uint256 id 改為 address
-            string memory proposalName, // 修改: 從 title 改為 proposalName
-            uint256 amount,            // 新增: 金額
+            address creator,            
+            string memory proposalName,
+            uint256 amount,           
             uint256 startedDate,
-            uint256 dueDate,
+            uint256 dueDate, 
             bool canFinalize,
-            string memory previewCID,  
-            string memory zipCID,      // 修改: 改用 proofCid 
-            uint256 total_avail_count,
-            uint256 support_count,
-            uint256 reject_count
+            string memory previewCID,
+            string memory zipCID,
+            VotingResult memory voting_result
         )
     {
         Proposal storage proposal = proposals[proposalId];
         
+        // 新增：定義投票結果struct
+        VotingResult memory result = VotingResult({
+            total_avail_count: votingPower[proposal.disasterId][msg.sender],
+            support_count: proposal.approveVotes,
+            reject_count: proposal.rejectVotes
+        });
+        
         return (
-            proposal.proposer,         // creator
-            proposal.title,           // proposalName
-            proposal.amount,          // amount
-            proposal.votingDeadline - VOTING_PERIOD,  // startedDate 
-            proposal.votingDeadline,  // dueDate
-            !proposal.approved && block.timestamp > proposal.votingDeadline, // canFinalize
-            proposal.photoCid,        // previewCID
-            proposal.proofCid,        // zipCID (改用 proofCid)
-            votingPower[proposal.disasterId][msg.sender], // total_avail_count
-            proposal.approveVotes,    // support_count  
-            proposal.rejectVotes      // reject_count
+            proposal.proposer,
+            proposal.title,
+            proposal.amount,
+            proposal.votingDeadline - VOTING_PERIOD,
+            proposal.votingDeadline,
+            !proposal.approved && block.timestamp > proposal.votingDeadline,
+            proposal.photoCid,
+            proposal.proofCid,
+            result
         );
+    }
+
+    struct VotingResult {
+        uint256 total_avail_count;
+        uint256 support_count; 
+        uint256 reject_count;
     }
 
     // ====== Utility Functions ======
