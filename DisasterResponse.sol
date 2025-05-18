@@ -179,7 +179,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         request.photoCid = photoCid;
         request.description = description;
         request.proposer = msg.sender;
-        request.approved = false;
+        request.ended = false;
         request.approveVotes = 0;
         request.rejectVotes = 0;
         request.votingDeadline = block.timestamp + VOTING_PERIOD;
@@ -469,7 +469,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 count = 0;
         for (uint256 i = 1; i <= requestCount; i++) {
             if (
-                !requests[i].approved &&
+                !requests[i].ended &&
                 block.timestamp <= requests[i].votingDeadline
             ) {
                 votableRequests[count] = requests[i];
@@ -530,7 +530,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             request.title,
             request.photoCid,
             request.proposer,
-            request.approved,
+            request.ended,
             request.approveVotes,
             request.rejectVotes,
             request.votingDeadline
