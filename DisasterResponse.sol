@@ -23,7 +23,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         string photoCid;
         string description;
         address proposer;
-        bool approved;
+        bool ended;
         uint256 approveVotes;
         uint256 rejectVotes;
         uint256 votingDeadline;
@@ -67,7 +67,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // 要如何把災難設為不活躍？一樣做一個函數給人呼叫並給予獎勵？有沒有其他辦法？
     uint256 public requestCount;
     uint256 public proposalCount;
-    uint256 public stakeAmount = 0.1 ether;
+    uint256 public stakeAmount = 0.01 ether;
     uint256 public newRewardAmount = 0.005 ether;
     // uint256 public finalizeRewardAmount = 0.001 ether; // 刪除：未使用
     uint256 public constant VOTING_PERIOD = 3 days;
@@ -171,7 +171,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 deadline,
         address residualAddress
     ) external payable {
-        require(msg.value == stakeAmount, "Must stake 0.1 ETH");
+        require(msg.value == stakeAmount, "Must stake 0.01 ETH");
         requestCount++;
         Request storage request = requests[requestCount];
         request.id = requestCount;
@@ -212,7 +212,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         Request storage request = requests[requestId];
         require(admins[msg.sender], "Only admins can finalize a disaster."); // Restrict to admins
         // 由於是管理員投票並最終化，不需 timeLock
-        require(!request.approved, "Already finalized");
+        require(!request.ended, "Already finalized");
         // 以 admin 數量作為總票數
         uint256 totalVotes = getAdminCount();
         bool passed = request.approveVotes > request.rejectVotes &&
@@ -244,7 +244,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             // 還是檢查一下，以防真的不夠發。
             payable(request.proposer).transfer(returnAmount);
         }
-        request.approved = true;
+        request.ended = true;
     }
 
     // ====== Proposal Functions ======
@@ -309,7 +309,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // 最終化請款提案，根據投票結果決定是否通過
     function finalizeProposal(uint256 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
-        require(block.timestamp > proposal.timeLock, "Timelock not reached.");
+        // require(block.timestamp > proposal.timeLock, "Timelock not reached.");
+        // 以上這行無論在測試時或 demo 時都需要停用，除非實際使用才需要，因此暫時註解掉。
         require(!proposal.approved, "Already approved");
         uint256 totalVotes = disasters[proposal.disasterId].totalVotes;
         bool passed = proposal.approveVotes > proposal.rejectVotes &&
@@ -375,6 +376,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 newVotingPower
     ) internal {
         for (uint256 i = 1; i <= proposalCount; i++) {
+            if (proposals[i].approved) {
+                continue;
+            }
             if (
                 proposals[i].disasterId == disasterId &&
                 proposalHasVoted[i][voter]
@@ -416,9 +420,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     // ====== View Functions ======
     // 獲取災難總數
-    function getDisasterCount() external view returns (uint256) {
-        return disasterCount;
-    }
+    // function getDisasterCount() external view returns (uint256) {
+    //     return disasterCount;
+    // }
+    // 這兩個函數是完全可以省略，暫時註解，若網頁組能接受刪除就刪除，若真的需要就取消註解。
 
     // 獲取所有災難的列表
     function getDisasterList() external view returns (Disaster[] memory) {
@@ -430,11 +435,11 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 根據災難 ID 獲取災難詳情
-    function getDisasterById(
-        uint256 disasterId
-    ) external view returns (Disaster memory) {
-        return disasters[disasterId];
-    }
+    // function getDisasterById(
+    //     uint256 disasterId
+    // ) external view returns (Disaster memory) {
+    //     return disasters[disasterId];
+    // }
 
     // 獲取用戶可以投票的災難 ID 列表
     function getVotableDisaster(
