@@ -87,8 +87,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     event DisasterRequested(
         uint256 indexed requestId,
         address proposer,
-        string title,
-        uint256 deadline
+        string title
     );
     event ProposalProposed(
         uint256 indexed proposalId,
@@ -168,7 +167,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         string memory title,
         string memory photoCid,
         string memory description,
-        uint256 deadline,
         address residualAddress
     ) external payable {
         require(msg.value == stakeAmount, "Must stake 0.01 ETH");
@@ -184,7 +182,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         request.rejectVotes = 0;
         request.votingDeadline = block.timestamp + VOTING_PERIOD;
         request.residualAddress = residualAddress;
-        emit DisasterRequested(requestCount, msg.sender, title, deadline);
+        emit DisasterRequested(requestCount, msg.sender, title);
     }
 
     // 管理員對災難請求進行投票
