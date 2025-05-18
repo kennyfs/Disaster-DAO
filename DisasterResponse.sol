@@ -691,36 +691,36 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     function getProposalDetails(
         uint256 proposalId
     )
-        external
+        external 
         view
         returns (
-            uint256 id,
-            string memory title,
-            address creator,
+            address creator,            // 修改: 從 uint256 id 改為 address
+            string memory proposalName, // 修改: 從 title 改為 proposalName
+            uint256 amount,            // 新增: 金額
             uint256 startedDate,
             uint256 dueDate,
             bool canFinalize,
-            string memory previewCID,
-            string memory zipCID,
+            string memory previewCID,  
+            string memory zipCID,      // 修改: 改用 proofCid 
             uint256 total_avail_count,
             uint256 support_count,
             uint256 reject_count
         )
     {
         Proposal storage proposal = proposals[proposalId];
-
+        
         return (
-            proposal.id,
-            proposal.title,
-            proposal.proposer,
-            proposal.votingDeadline - VOTING_PERIOD, // startedDate
-            proposal.votingDeadline,
-            !proposal.approved && block.timestamp > proposal.votingDeadline,
-            proposal.photoCid, // previewCID
-            proposal.photoCid, // zipCID (in this case we use same CID)
-            votingPower[proposal.disasterId][msg.sender],
-            proposal.approveVotes,
-            proposal.rejectVotes
+            proposal.proposer,         // creator
+            proposal.title,           // proposalName
+            proposal.amount,          // amount
+            proposal.votingDeadline - VOTING_PERIOD,  // startedDate 
+            proposal.votingDeadline,  // dueDate
+            !proposal.approved && block.timestamp > proposal.votingDeadline, // canFinalize
+            proposal.photoCid,        // previewCID
+            proposal.proofCid,        // zipCID (改用 proofCid)
+            votingPower[proposal.disasterId][msg.sender], // total_avail_count
+            proposal.approveVotes,    // support_count  
+            proposal.rejectVotes      // reject_count
         );
     }
 
