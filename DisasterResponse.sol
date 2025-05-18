@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -11,7 +11,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         string photoCid; // 代表性的災難照片
         string description;
         uint256 deadline; // 可以固定為開始日期起 6 個月之類的，方便實作
-        uint256 totalDonations;
+        uint256 balance;
         uint256 totalVotes; // 新增：每個災難的總投票權
         address residualAddress;
     }
@@ -46,6 +46,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 approveVotes;
         uint256 rejectVotes;
         uint256 votingDeadline;
+        uint256 timeLock;
         // mapping(address => bool) hasVoted; // moved out
         // mapping(address => bool) voteType; // moved out
     }
@@ -213,10 +214,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // 最終化災難請求，根據投票結果決定是否通過
     function finalizeDisaster(uint256 requestId) external nonReentrant {
         Request storage request = requests[requestId];
-        // require(
-        //     block.timestamp > request.votingDeadline,
-        //     "Voting period not ended"
-        // );
+        require(admins[msg.sender], "Only admins can finalize a disaster."); // Restrict to admins
+        // 由於是管理員投票並最終化，不需 timeLock
         require(!request.approved, "Already finalized");
         // 以 admin 數量作為總票數
         uint256 totalVotes = getAdminCount();
@@ -234,10 +233,20 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 0,
                 request.residualAddress
             );
-            payable(request.proposer).transfer(stakeAmount + newRewardAmount);
+            uint256 returnAmount = (address(this).balance <
+                stakeAmount + newRewardAmount)
+                ? address(this).balance
+                : stakeAmount + newRewardAmount;
+            // min(整個合約的餘額, 該發出去的錢)
+            payable(request.proposer).transfer(returnAmount);
             emit DisasterCreated(disasterCount);
         } else {
-            payable(request.proposer).transfer((stakeAmount * 9) / 10);
+            uint256 returnAmount = (address(this).balance <
+                (stakeAmount * 9) / 10)
+                ? address(this).balance
+                : (stakeAmount * 9) / 10;
+            // 還是檢查一下，以防真的不夠發。
+            payable(request.proposer).transfer(returnAmount);
         }
         request.approved = true;
     }
@@ -270,6 +279,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         proposal.approveVotes = 0;
         proposal.rejectVotes = 0;
         proposal.votingDeadline = block.timestamp + VOTING_PERIOD;
+        proposal.timeLock = block.timestamp + TIMELOCK;
 
         emit ProposalProposed(proposalCount, disasterId, msg.sender, title);
     }
@@ -303,7 +313,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // 最終化請款提案，根據投票結果決定是否通過
     function finalizeProposal(uint256 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
-        require(block.timestamp > proposal.votingDeadline, "Timelock not reached.");
+        require(block.timestamp > proposal.timeLock, "Timelock not reached.");
         require(!proposal.approved, "Already approved");
         uint256 totalVotes = disasters[proposal.disasterId].totalVotes;
         bool passed = proposal.approveVotes > proposal.rejectVotes &&
@@ -312,9 +322,16 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             MIN_APPROVE_RATIO_PROOF;
         require(passed, "Not enough votes");
         uint256 amount = proposal.amount;
-        require(address(this).balance >= amount, "Insufficient funds");
+        require(
+            address(this).balance >= amount &&
+                disasters[proposal.disasterId].balance >= amount,
+            "Insufficient funds"
+        );
+        // 確保整個合約的錢夠發，且該災難的錢也夠發。有可能因為發出 newRewardAmount 導致災難的錢夠發，但合約的錢不夠發。
+        // 若因為餘額不足而失敗，請款人再發一個 Proposal 即可。
         // 任何交易的 Gas fee 都由交易發起人負擔，而不是合約負擔，因此只要合約餘額足夠就可以了。
         payable(proposal.proposer).transfer(amount);
+        disasters[proposal.disasterId].balance -= amount;
         proposal.approved = true;
         emit ProposalApproved(proposalId);
     }
@@ -330,7 +347,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
         // Update donation and total donations
         donations[disasterId][msg.sender] += msg.value;
-        disasters[disasterId].totalDonations += msg.value;
+        disasters[disasterId].balance += msg.value;
 
         // Calculate new voting power
         uint256 previousVotingPower = votingPower[disasterId][msg.sender];
@@ -344,11 +361,17 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             previousVotingPower);
 
         // 調整已投票提案的 approve/reject votes
-        // 但我覺得不太必要
-        adjustProposalVotes(disasterId, msg.sender, previousVotingPower, newVotingPower);
+        adjustProposalVotes(
+            disasterId,
+            msg.sender,
+            previousVotingPower,
+            newVotingPower
+        );
 
         emit Donated(disasterId, msg.sender, msg.value, newVotingPower);
     }
+
+    // 調整已投票提案的 approve/reject votes
     function adjustProposalVotes(
         uint256 disasterId,
         address voter,
@@ -384,10 +407,15 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         );
 
         address residualAddress = disasters[disasterId].residualAddress;
-        uint256 remainingBalance = address(this).balance;
+        uint256 remainingBalance = (address(this).balance >
+            disasters[disasterId].balance)
+            ? disasters[disasterId].balance
+            : address(this).balance;
+        // 剩餘資金 = min(整個合約的餘額, 該災難的餘額)
 
         // 將剩餘的資金轉移到指定地址
         payable(residualAddress).transfer(remainingBalance);
+        disasters[disasterId].balance = 0;
     }
 
     // ====== View Functions ======
