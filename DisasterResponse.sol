@@ -28,8 +28,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 rejectVotes;
         uint256 votingDeadline;
         address residualAddress;
-        // mapping(address => bool) hasVoted; // Replace this
-        // mapping(address => bool) voteType; // New: Records the vote type (true for approve, false for reject)
     }
 
     struct Proposal {
@@ -47,8 +45,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 rejectVotes;
         uint256 votingDeadline;
         uint256 timeLock;
-        // mapping(address => bool) hasVoted; // moved out
-        // mapping(address => bool) voteType; // moved out
     }
 
     struct DonationRecord {
@@ -774,26 +770,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // ====== Utility Functions ======
-    // function toString(address account) internal pure returns (string memory) {
-    //     return toHexString(uint256(uint160(account)), 20);
-    // }
-
-    // // 將數值轉換為十六進制字串
-    // function toHexString(
-    //     uint256 value,
-    //     uint256 length
-    // ) internal pure returns (string memory) {
-    //     bytes16 _SYMBOLS = "0123456789abcdef";
-    //     bytes memory buffer = new bytes(2 * length + 2);
-    //     buffer[0] = "0";
-    //     buffer[1] = "x";
-    //     for (uint256 i = 2 * length + 1; i > 1; --i) {
-    //         buffer[i] = _SYMBOLS[value & 0xf];
-    //         value >>= 4;
-    //     }
-    //     return string(buffer);
-    // }
-
     // 計算平方根
     function sqrt(uint256 x) internal pure returns (uint256) {
         if (x == 0) return 0;
