@@ -213,10 +213,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // 最終化災難請求，根據投票結果決定是否通過
     function finalizeDisaster(uint256 requestId) external nonReentrant {
         Request storage request = requests[requestId];
-        require(
-            block.timestamp > request.votingDeadline,
-            "Voting period not ended"
-        );
+        // require(
+        //     block.timestamp > request.votingDeadline,
+        //     "Voting period not ended"
+        // );
         require(!request.approved, "Already finalized");
         // 以 admin 數量作為總票數
         uint256 totalVotes = getAdminCount();
@@ -303,7 +303,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // 最終化請款提案，根據投票結果決定是否通過
     function finalizeProposal(uint256 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
-        require(block.timestamp > TIMELOCK, "Timelock not reached.");
+        require(block.timestamp > proposal.votingDeadline, "Timelock not reached.");
         require(!proposal.approved, "Already approved");
         uint256 totalVotes = disasters[proposal.disasterId].totalVotes;
         bool passed = proposal.approveVotes > proposal.rejectVotes &&
