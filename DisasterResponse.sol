@@ -68,7 +68,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     uint256 public requestCount;
     uint256 public proposalCount;
     uint256 public stakeAmount = 0.01 ether;
-    uint256 public newRewardAmount = 0.005 ether;
+    uint256 public newRewardAmount = 0.0005 ether;
     // uint256 public finalizeRewardAmount = 0.001 ether; // 刪除：未使用
     uint256 public constant VOTING_PERIOD = 3 days;
     uint256 public constant TIMELOCK = 1 days;
