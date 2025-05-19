@@ -262,15 +262,9 @@
 
 ##### `getMyDonations`
 
-- 呼叫：`getMyDonations(uint256 from, uint256 to)`
+- 呼叫：`getMyDonations()`
 - 功能：返回呼叫者在指定範圍內的捐款記錄。
-- 參數：
-  - `from` (`uint256`)：起始災難 ID。
-  - `to` (`uint256`)：結束災難 ID。
 - 回傳：`DonationRecord[]` - 捐款記錄陣列。
-- 錯誤：
-  - 如果範圍無效，拋出 "Invalid range"。
-  - 如果範圍超出災難數量，拋出 "Range exceeds disaster count"。
 
 ##### `getDueDisaster`
 

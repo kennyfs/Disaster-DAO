@@ -582,15 +582,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     // 獲取用戶的捐款記錄
     function getMyDonations(
-        uint256 from,
-        uint256 to
     ) external view returns (DonationRecord[] memory) {
-        require(from < to, "Invalid range");
-        require(to <= disasterCount, "Range exceeds disaster count");
-
         // First count valid donations in range
         uint256 count = 0;
-        for (uint256 i = from; i < to; i++) {
+        for (uint256 i = 1; i <= disasterCount; i++) {
             if (donations[i][msg.sender] > 0) {
                 count++;
             }
@@ -600,7 +595,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         uint256 index = 0;
 
         // Fill records array
-        for (uint256 i = from; i < to; i++) {
+        for (uint256 i = 1; i <= disasterCount; i++) {
             if (donations[i][msg.sender] > 0) {
                 records[index] = DonationRecord({
                     disasterId: i,
