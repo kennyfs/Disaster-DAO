@@ -270,13 +270,13 @@
 
 - 呼叫：`getDueDisaster()`
 - 功能：返回已到期的災難 ID 列表。
-- 回傳：`uint256[]` - 已到期災難 ID 陣列。
+- 回傳：`Disaster[]` - 已到期的災難結構體陣列。
 
 ##### `getOngoingDisaster`
 
 - 呼叫：`getOngoingDisaster()`
 - 功能：返回正在進行中的災難 ID 列表。
-- 回傳：`uint256[]` - 進行中災難 ID 陣列。
+- 回傳：`Disaster[]` - 進行中的災難結構體陣列。
 
 ##### `getUnvoteProposal`
 
@@ -327,6 +327,7 @@
 
 - 用途：儲存災難的相關資訊。
 - 欄位：
+  - `uint256 id`: 災難id。
   - `string name`: 災難名稱。
   - `string photoCid`: 災難照片的 IPFS CID。
   - `string description`: 災難描述。
