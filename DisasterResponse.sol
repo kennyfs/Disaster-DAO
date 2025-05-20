@@ -465,6 +465,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
     // 獲取用戶可以投票的災難請求
     function getVotableRequests() external view returns (Request[] memory) {
+        require(admins[msg.sender], "Only admins can vote"); // Restrict to admins
         Request[] memory votableRequests = new Request[](requestCount);
         uint256 count = 0;
         for (uint256 i = 1; i <= requestCount; i++) {
