@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract DisasterResponse is Ownable, ReentrancyGuard {
     // ====== Structs ======
     struct Disaster {
+        uint256 id;
         string name;
         string photoCid; // 代表性的災難照片
         string description;
@@ -221,6 +222,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         if (passed) {
             disasterCount++;
             disasters[disasterCount] = Disaster(
+                disasterCount,
                 request.title,
                 request.photoCid,
                 request.description,
@@ -627,9 +629,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         }
 
         // Create correctly sized array
-        uint256[] memory result = new uint256[](count);
+        Disaster[] memory result = new Disaster[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = dueDisasters[i];
+            result[i] = disasters[dueDisasters[i]];
         }
         return result;
     }
@@ -646,9 +648,9 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             }
         }
 
-        uint256[] memory result = new uint256[](count);
+        Disaster[] memory result = new Disaster[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = activeDisasters[i];
+            result[i] = disasters[activeDisasters[i]];
         }
         return result;
     }
