@@ -403,10 +403,10 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     // ====== Disaster End ======
     function endDisaster(uint256 disasterId) external {
         // 若過期，把錢全部給指定的地址
-        require(
-            block.timestamp > disasters[disasterId].deadline,
-            "Disaster not ended"
-        );
+        // require(
+        //     block.timestamp > disasters[disasterId].deadline,
+        //     "Disaster not ended"
+        // );
 
         address residualAddress = disasters[disasterId].residualAddress;
         uint256 remainingBalance = (address(this).balance >
