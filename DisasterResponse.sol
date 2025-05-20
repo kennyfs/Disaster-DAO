@@ -50,6 +50,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     struct DonationRecord {
         uint256 disasterId;
         string name;
+        address donateAddress;
+        string photoCid;
         uint256 total_amount;
         uint256 vote_per;
     }
@@ -600,6 +602,8 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
                 records[index] = DonationRecord({
                     disasterId: i,
                     name: disasters[i].name,
+                    donateAddress: disasters[i].residualAddress,
+                    photoCid: disasters[i].photoCid,
                     total_amount: donations[i][msg.sender],
                     vote_per: votingPower[i][msg.sender]
                 });
