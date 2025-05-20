@@ -617,7 +617,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取已到期的災難 ID 列表
-    function getDueDisaster() external view returns (uint256[] memory) {
+    function getDueDisaster() external view returns (Disaster[] memory) {
         uint256[] memory dueDisasters = new uint256[](disasterCount);
         uint256 count = 0;
 
@@ -637,7 +637,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // 獲取正在進行中的災難 ID 列表
-    function getOngoingDisaster() external view returns (uint256[] memory) {
+    function getOngoingDisaster() external view returns (Disaster[] memory) {
         uint256[] memory activeDisasters = new uint256[](disasterCount);
         uint256 count = 0;
 
