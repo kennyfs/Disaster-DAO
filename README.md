@@ -374,6 +374,8 @@
 - 欄位：
   - `uint256 disasterId`: 災難 ID。
   - `string name`: 災難名稱。
+  - `address donateAddress`:剩餘資金的接收地址。
+  - `string photoCid`: 提案照片的 IPFS CID。
   - `uint256 total_amount`: 捐款總金額（單位：wei）。
   - `uint256 vote_per`: 用戶的投票權。
 
