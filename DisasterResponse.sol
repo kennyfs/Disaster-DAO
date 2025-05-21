@@ -764,7 +764,7 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
 
         // 新增：定義投票結果struct
         VotingResult memory result = VotingResult({
-            total_avail_count: votingPower[proposal.disasterId][queryAddress],
+            total_avail_count: disasters[proposal.disasterId].totalVotes,
             support_count: proposal.approveVotes,
             reject_count: proposal.rejectVotes
         });
