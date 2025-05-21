@@ -421,12 +421,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
     }
 
     // ====== View Functions ======
-    // 獲取災難總數
-    // function getDisasterCount() external view returns (uint256) {
-    //     return disasterCount;
-    // }
-    // 這兩個函數是完全可以省略，暫時註解，若網頁組能接受刪除就刪除，若真的需要就取消註解。
-
     // 獲取所有災難的列表
     function getDisasterList() external view returns (Disaster[] memory) {
         Disaster[] memory disasterList = new Disaster[](disasterCount);
@@ -435,13 +429,6 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
         }
         return disasterList;
     }
-
-    // 根據災難 ID 獲取災難詳情
-    // function getDisasterById(
-    //     uint256 disasterId
-    // ) external view returns (Disaster memory) {
-    //     return disasters[disasterId];
-    // }
 
     // 獲取用戶可以投票的災難 ID 列表
     function getVotableDisaster(
@@ -540,6 +527,25 @@ contract DisasterResponse is Ownable, ReentrancyGuard {
             request.rejectVotes,
             request.votingDeadline
         );
+    }
+
+    // 獲取指定災難的請款提案列表
+    function getProposalList(
+        uint256 disasterId
+    ) external view returns (Proposal[] memory) {
+        Proposal[] memory proposalList = new Proposal[](proposalCount);
+        uint256 count = 0;
+        for (uint256 i = 1; i <= proposalCount; i++) {
+            if (proposals[i].disasterId == disasterId) {
+                proposalList[count] = proposals[i];
+                count++;
+            }
+        }
+        Proposal[] memory result = new Proposal[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = proposalList[i];
+        }
+        return result;
     }
 
     // 獲取指定請款提案的詳情
