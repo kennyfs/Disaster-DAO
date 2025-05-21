@@ -208,7 +208,7 @@
 
 ##### `getVotableRequests`
 
-- 呼叫：`getVotableRequests()`
+- 呼叫：`getVotableRequests(address queryAddress)`
 - 功能：返回當前可投票的災難請求列表（僅限管理員）。
 - 回傳：`Request[]` - 可投票的災難請求陣列。
 
@@ -256,13 +256,13 @@
 
 ##### `getMyDonationsCount`
 
-- 呼叫：`getMyDonationsCount()`
+- 呼叫：`getMyDonationsCount(address queryAddress)`
 - 功能：返回呼叫者捐款過的災難數量。
 - 回傳：`uint256` - 捐款過的災難數量。
 
 ##### `getMyDonations`
 
-- 呼叫：`getMyDonations()`
+- 呼叫：`getMyDonations(address queryAddress)`
 - 功能：返回呼叫者在指定範圍內的捐款記錄。
 - 回傳：`DonationRecord[]` - 捐款記錄陣列。
 
@@ -280,7 +280,7 @@
 
 ##### `getUnvoteProposal`
 
-- 呼叫：`getUnvoteProposal(uint256 disasterId)`
+- 呼叫：`getUnvoteProposal(uint256 disasterId, address queryAddress)`
 - 功能：返回呼叫者尚未投票的請款提案 ID 列表。
 - 參數：
   - `disasterId` (`uint256`)：相關災難的 ID。
@@ -288,7 +288,7 @@
 
 ##### `getVotedProposal`
 
-- 呼叫：`getVotedProposal(uint256 disasterId)`
+- 呼叫：`getVotedProposal(uint256 disasterId, address queryAddress)`
 - 功能：返回呼叫者已投票的請款提案 ID 列表。
 - 參數：
   - `disasterId` (`uint256`)：相關災難的 ID。
@@ -304,7 +304,7 @@
 
 ##### `getProposalDetails`
 
-- 呼叫：`getProposalDetails(uint256 proposalId)`
+- 呼叫：`getProposalDetails(uint256 proposalId, address queryAddress)`
 - 功能：返回指定請款提案的詳細資訊，包括投票結果。
 - 參數：
   - `proposalId` (`uint256`)：提案 ID。
